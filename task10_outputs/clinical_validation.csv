@@ -1,0 +1,11 @@
+Vignette,Expected,Decision,Rules fired,Result
+V1 Classic diabetic (2-h OGTT 230),"HIGH, R9 fires",HIGH,R4 R9 R11 R15 R16 R6,PASS
+V2 Impaired glucose tolerance (OGTT 165),"at least MODERATE, R10 fires",HIGH,R10 R11 R15 R6 R7,PASS
+V3 Healthy young adult,"LOW, R8 routine check-up",LOW,R13 R8,PASS
+"V4 Lab-confirmed diabetes, OGTT not done","HIGH via R1, glucose imputed",HIGH,R1 R13 R16 R6,PASS
+"V5 Pre-diabetes labs (FPG 110, HbA1c 6.0)","at least MODERATE, R2 fires",MODERATE,R2 R13 R7,PASS
+"V6 Obese with family history, normal OGTT","at least MODERATE, R4 fires",MODERATE,R4 R13 R6,PASS
+V7 Older and physically inactive,R5 fires (Risk = Moderate),LOW,R5 R13 R14 R8,PASS
+V8 Insulin and skin fold not measured,"assessed, imputed, R16 flag",LOW,R13 R16 R8,PASS
+V9 Impossible glucose (900),rejected (invalid),INVALID,,PASS
+V10 Age 85 (outside training data),"assessed with warning, R16 flag",LOW,R13 R16 R8,PASS

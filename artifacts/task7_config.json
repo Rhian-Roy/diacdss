@@ -1,0 +1,90 @@
+{
+  "features": [
+    "Glucose",
+    "Glucose_Insulin_Ratio",
+    "Insulin",
+    "Insulin_BMI_Ratio",
+    "BMI",
+    "SkinThickness",
+    "BloodPressure",
+    "Age",
+    "Pregnancies",
+    "DiabetesPedigreeFunction",
+    "High_Risk_Flag"
+  ],
+  "feature_groups": {
+    "Glycaemic / metabolic": [
+      "Glucose",
+      "Glucose_Insulin_Ratio",
+      "Insulin",
+      "Insulin_BMI_Ratio"
+    ],
+    "Adiposity": [
+      "BMI",
+      "SkinThickness"
+    ],
+    "Cardiovascular": [
+      "BloodPressure"
+    ],
+    "Demographic / history": [
+      "Age",
+      "Pregnancies"
+    ],
+    "Genetic / composite": [
+      "DiabetesPedigreeFunction",
+      "High_Risk_Flag"
+    ]
+  },
+  "task6_order": [
+    "Pregnancies",
+    "Glucose",
+    "BloodPressure",
+    "SkinThickness",
+    "Insulin",
+    "BMI",
+    "DiabetesPedigreeFunction",
+    "Age",
+    "Insulin_BMI_Ratio",
+    "Glucose_Insulin_Ratio",
+    "High_Risk_Flag"
+  ],
+  "thresholds": {
+    "DNN": 0.41950130462646484,
+    "CNN1D": 0.4066159427165985,
+    "AttentionDNN": 0.5281006097793579,
+    "Logistic Regression": 0.31729187018314364,
+    "Decision Tree": 0.42857142857142855,
+    "Random Forest": 0.28466903946460087,
+    "SVM": 0.34702952471908555,
+    "XGBoost": 0.2955734133720398
+  },
+  "best_params": {
+    "DNN": {
+      "units": [
+        64,
+        32,
+        16
+      ],
+      "lr": 0.0003
+    },
+    "CNN1D": {
+      "filters": [
+        16,
+        32
+      ],
+      "kernel_size": 2
+    },
+    "AttentionDNN": {
+      "units": [
+        32,
+        16
+      ],
+      "dropout": 0.4
+    }
+  },
+  "best_dl_model": "DNN",
+  "seed": 42,
+  "early_stopping_monitor": "val_loss",
+  "tensorflow": "2.21.0",
+  "sklearn": "1.8.0"
+}

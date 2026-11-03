@@ -1,0 +1,18 @@
+Test,Status,Time (s)
+test_rejects_impossible_values,PASS,3.286
+test_imputes_zero_as_missing,PASS,0.0
+test_warns_outside_training_range,PASS,0.0
+test_feature_engineering_reproduces_task5,PASS,0.007
+test_task2_cases[facts0-Diabetes Positive-Consult Endocrinologist & Lifestyle Intervention],PASS,0.001
+test_task2_cases[facts1-Normal-Routine Annual Checkup],PASS,0.0
+test_task2_cases[facts2-Pre-diabetes-Lifestyle Modification & Close Monitoring],PASS,0.0
+test_ogtt_rule_overrides_models,PASS,0.607
+test_astar_is_optimal[High-S10],PASS,0.001
+test_astar_is_optimal[Low-S8],PASS,0.0
+test_astar_is_optimal[Moderate-S9],PASS,0.0
+test_model_outputs_are_probabilities_and_deterministic,PASS,0.07
+test_batch_matches_single,PASS,1.777
+test_end_to_end_with_explanation,PASS,1.109
+test_invalid_input_is_not_assessed,PASS,0.0
+test_clinical_report_pdf,PASS,0.733
+test_same_input_same_output,PASS,1.348

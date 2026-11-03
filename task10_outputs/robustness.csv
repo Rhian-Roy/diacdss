@@ -1,0 +1,4 @@
+Test,Result
+Insulin + skin fold missing for all patients,93.5% of decisions unchanged
+±5% measurement noise (10 runs),92.1% of decisions unchanged (min 87.0%)
+Malformed inputs handled without crashing,"6/6 handled: ['invalid', 'invalid', 'invalid', 'ok', 'invalid', 'ok']"

@@ -1,0 +1,11 @@
+Principle,Status,Evidence
+Fairness,Partially met,Equal-opportunity gap across age groups 0.28 (DNN alone 0.39); groups are small
+Transparency / explainability,Met,"Every decision shows SHAP drivers, the fired rules, the A* pathway and a what-if"
+Human oversight,Met,"Decision support only; disclaimers; flags for low trust, model disagreement and unreliable input"
+Safety,Met,Physiological limits reject impossible values; ADA OGTT/HbA1c rules override the models
+Robustness,Met,92% of decisions unchanged under ±5% noise; malformed input never crashes
+Privacy & data protection,Met (prototype),No patient data stored; report uses an ID only; production use needs consent and DPDP Act 2023 compliance
+Accountability / auditability,Met,"Rule trace, model versions and thresholds in every PDF report; same input gives same output"
+Calibration of risk %,Partially met,DNN overestimates risk (class weights); recalibration needed before showing percentages
+Data representativeness / bias,Not met,Trained only on 768 women of Pima heritage; needs external validation on Indian patients
+Regulatory readiness,Not met,Research prototype; clinical use would need CDSCO medical-device (SaMD) approval
