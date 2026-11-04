@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: diacdss
+    runtime: docker
+    plan: free
+    healthCheckPath: /_stcore/health
+    autoDeployTrigger: commit
