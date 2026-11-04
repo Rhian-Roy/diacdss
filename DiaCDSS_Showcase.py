@@ -17,7 +17,7 @@ import streamlit as st
 HERE = os.path.dirname(os.path.abspath(__file__))
 os.chdir(HERE)
 sys.path.insert(0, HERE)
-from cdss_core import CDSS, ATTRIBUTES, BASE
+from cdss_core import CDSS, ATTRIBUTES, BASE, DIAG_RANK
 import project_tasks as pt
 
 st.set_page_config(page_title="DiaCDSS · CELBC710 Group 1", page_icon="🩺", layout="wide")
@@ -31,6 +31,48 @@ def show_image(path, caption=None):
         st.image(path, caption=caption)
     else:
         st.info(f"Figure not found: {path}")
+
+LABELS = {"Pregnancies": "Pregnancies", "Glucose": "Glucose (2-h, mg/dL)", "BloodPressure": "Blood pressure (mm Hg)",
+          "SkinThickness": "Skin fold (mm)", "Insulin": "Insulin (µU/mL)", "BMI": "BMI (kg/m²)",
+          "DiabetesPedigreeFunction": "Family-history score (DPF)", "Age": "Age (years)"}
+
+def plain_words(res):
+    """The decision explained in plain English, built only from what the pipeline actually computed."""
+    f, thr, g = res["facts"], res["thresholds"], res["clean"]["Glucose"]
+    gtxt = f"{g:g}" + (" (not measured, so the training median was used)" if res["input"].get("Glucose") in (0, None) else "")
+    ai = f.get("AI_Risk")
+    out = [f"**The two models.** XGBoost gives {res['p_xgb']:.0%} (it counts as High at {thr['XGBoost']:.0%} or more) → **{f['ML_Risk']}**. "
+           f"The neural network gives {res['p_dnn']:.0%} (High at {thr['DNN']:.0%} or more) → **{f['DL_Risk']}**. "
+           + {"High": "Both say High, so rule R11 sets the AI risk to High.",
+              "Moderate": "They disagree, so rule R12 sets the AI risk to Moderate and asks for clinician review.",
+              "Low": "Both say Low, so rule R13 sets the AI risk to Low."}.get(ai, "")]
+    diag = f.get("Diagnosis")
+    if diag == "Diabetes range (OGTT >= 200)":
+        out.append(f"**The glucose rule.** 2-hour glucose {gtxt} is 200 or more, so rule R9 marks the diabetes range.")
+    elif diag == "Impaired glucose tolerance":
+        out.append(f"**The glucose rule.** 2-hour glucose {gtxt} is between 140 and 199, so rule R10 marks impaired glucose tolerance (pre-diabetes range).")
+    elif diag in ("Diabetes Positive", "Pre-diabetes", "Normal"):
+        out.append(f"**The lab rules.** The HbA1c and fasting glucose entered give **{diag}** (rules R1-R3).")
+    else:
+        out.append(f"**The glucose rule.** 2-hour glucose {gtxt} is below 140, so no glucose rule fires (normal range).")
+    if f.get("Risk_Level") == "High":
+        out.append("**Risk factors.** BMI 30 or more with a family history of diabetes, so rule R4 sets risk factors to High.")
+    elif f.get("Risk_Level") == "Moderate":
+        out.append("**Risk factors.** Age over 45 with low physical activity, so rule R5 sets risk factors to Moderate.")
+    d, rank = res["decision"], DIAG_RANK.get(diag)
+    if d == "HIGH":
+        why = [w for c, w in [(rank == 3, "a glucose or lab rule found a diabetes-range value"), (ai == "High", "both models say High")] if c]
+    elif d == "MODERATE":
+        why = [w for c, w in [(ai == "Moderate", "the two models disagree"), (rank == 2, "glucose is in the pre-diabetes range"),
+                              (f.get("Risk_Level") == "High", "the risk-factor rule R4 says High")] if c]
+    else:
+        why = ["both models are below their thresholds and no rule found an abnormal glucose value"]
+    out.append(f"**So the decision is {d}** because " + " and ".join(why) + ".")
+    if res.get("drivers"):
+        t = res["drivers"][0]
+        out.append(f"**Biggest single factor (SHAP).** {LABELS.get(t['feature'], t['feature'])} = {t['value']:g} "
+                   f"{'pushed the risk up' if t['shap'] > 0 else 'pulled the risk down'} the most.")
+    return out
 
 def show_csv(path, **kw):
     if os.path.exists(path):
@@ -94,25 +136,29 @@ elif page == PAGES[1]:
         "Patient 32: healthy, lowest risk": dict(Pregnancies=3, Glucose=88, BloodPressure=58, SkinThickness=11, Insulin=54, BMI=24.8, DiabetesPedigreeFunction=0.267, Age=22),
         "Patient 6: diabetic with normal glucose (missed case)": dict(Pregnancies=3, Glucose=78, BloodPressure=50, SkinThickness=32, Insulin=88, BMI=31.0, DiabetesPedigreeFunction=0.248, Age=26),
         "Invalid input (glucose 900, age 15)": dict(Pregnancies=2, Glucose=900, BloodPressure=70, SkinThickness=20, Insulin=80, BMI=25.0, DiabetesPedigreeFunction=0.3, Age=15),
+        "Custom patient: type your own values": dict(Pregnancies=1, Glucose=110, BloodPressure=72, SkinThickness=0, Insulin=0, BMI=27.0, DiabetesPedigreeFunction=0.35, Age=35),
     }
-    preset = st.selectbox("Choose a patient (you can edit any value)", list(PRESETS), key="preset")
+    preset = st.selectbox("Choose a patient, or pick the last option to type your own values", list(PRESETS), key="preset")
     vals = PRESETS[preset]
-    cols = st.columns(8)
+    st.caption("Change any value, then press **Run**. 0 means *not measured* for glucose, blood pressure, skin fold, insulin and BMI "
+               "(the system fills in the training median). Impossible values are rejected by the Task 1 constraints.")
     raw = {}
-    for c, f in zip(cols, BASE):
-        raw[f] = c.number_input(f"{f}", value=float(vals[f]), key=f"{preset}|{f}",
-                                step=0.001 if f == "DiabetesPedigreeFunction" else (0.1 if f == "BMI" else 1.0),
-                                format="%.3f" if f == "DiabetesPedigreeFunction" else ("%.1f" if f == "BMI" else "%.0f"),
-                                help=ATTRIBUTES[f]["unit"] + (" · 0 = not measured" if ATTRIBUTES[f]["zero_missing"] else ""))
+    for row in (BASE[:4], BASE[4:]):
+        for c, f in zip(st.columns(4), row):
+            lo, hi = ATTRIBUTES[f]["hard"]
+            raw[f] = c.number_input(LABELS[f], value=float(vals[f]), key=f"{preset}|{f}",
+                                    step=0.001 if f == "DiabetesPedigreeFunction" else (0.1 if f == "BMI" else 1.0),
+                                    format="%.3f" if f == "DiabetesPedigreeFunction" else ("%.1f" if f == "BMI" else "%.0f"),
+                                    help=f"{ATTRIBUTES[f]['unit']} · allowed {lo:g} to {hi:g}" + (" · 0 = not measured" if ATTRIBUTES[f]["zero_missing"] else ""))
     with st.expander("Optional clinical information (used by rules R1–R5)"):
         o = st.columns(5)
-        hb = o[0].number_input("HbA1c % (0 = not available)", 0.0, 20.0, 0.0, 0.1, key="hb")
-        fpg = o[1].number_input("Fasting glucose (0 = n/a)", 0.0, 600.0, 0.0, 1.0, key="fpg")
+        hb = o[0].number_input("HbA1c % (0 = not available)", 0.0, 20.0, 0.0, 0.1, key=f"{preset}|hb")
+        fpg = o[1].number_input("Fasting glucose (0 = n/a)", 0.0, 600.0, 0.0, 1.0, key=f"{preset}|fpg")
         raw["HbA1c"] = hb or None
         raw["FastingGlucose"] = fpg or None
-        raw["FamilyHistory"] = o[2].selectbox("Family history", ["Unknown", "Yes", "No"], key="fh")
-        raw["PhysicalActivity"] = o[3].selectbox("Physical activity", ["Unknown", "Low", "Moderate", "High"], key="pa")
-        raw["Symptoms"] = o[4].selectbox("Classic symptoms", ["Unknown", "Yes", "No"], key="sym")
+        raw["FamilyHistory"] = o[2].selectbox("Family history", ["Unknown", "Yes", "No"], key=f"{preset}|fh")
+        raw["PhysicalActivity"] = o[3].selectbox("Physical activity", ["Unknown", "Low", "Moderate", "High"], key=f"{preset}|pa")
+        raw["Symptoms"] = o[4].selectbox("Classic symptoms", ["Unknown", "Yes", "No"], key=f"{preset}|sym")
     for k in ("FamilyHistory", "PhysicalActivity", "Symptoms"):
         if raw[k] == "Unknown":
             raw[k] = None
@@ -121,9 +167,13 @@ elif page == PAGES[1]:
         with st.spinner("Validation → features → XGBoost + DNN → rules → A* → SHAP…"):
             st.session_state["res"] = cdss.assess(raw, explain=True)
             st.session_state["res_for"] = preset
+            st.session_state["res_raw"] = dict(raw)
     res = st.session_state.get("res")
     if res is None:
         st.info("Click **Run the complete system**. Each step below is labelled with the task that performs it.")
+        st.stop()
+    if st.session_state.get("res_raw") != raw:   # never show a result that belongs to other values
+        st.warning("The values above have changed. Press **▶ Run the complete system** to get the result for these values.")
         st.stop()
     if res["status"] == "invalid":
         with st.container(border=True):
@@ -137,7 +187,13 @@ elif page == PAGES[1]:
     d = res["decision"]
     {"HIGH": st.error, "MODERATE": st.warning, "LOW": st.success}[d](
         f"### Final decision: {d} RISK → {res['facts'].get('Recommendation', 'Clinical judgement')}")
-    st.caption(f"Whole pipeline ran in {res['latency_s']:.2f} s. Patient: {st.session_state.get('res_for')}.")
+    st.caption(f"Whole pipeline ran in {res['latency_s']:.2f} s. Patient: {st.session_state.get('res_for').split(':')[0]}. Inputs: "
+               + " · ".join(f"{LABELS[f].split(' (')[0]} {res['input'][f]:g}" + (" (not measured)" if res['input'][f] == 0 and ATTRIBUTES[f]['zero_missing'] else "")
+                            for f in BASE))
+    with st.container(border=True):
+        st.markdown("#### In plain words")
+        for line in plain_words(res):
+            st.markdown("- " + line)
 
     with st.container(border=True):
         st.markdown("#### Step 1 · Task 1: knowledge model → input validation")
